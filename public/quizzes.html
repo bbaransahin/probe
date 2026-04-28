@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PROBE Quizzes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-frame">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <p class="eyebrow">Recall workspace</p>
+          <h1>PROBE</h1>
+        </div>
+
+        <nav class="view-switcher topbar-nav" aria-label="Primary">
+          <a class="view-button" href="/map">Map</a>
+          <a class="view-button" href="/">Notes</a>
+          <a class="view-button is-active" href="/quizzes">Quizzes</a>
+        </nav>
+
+        <div class="topbar-actions">
+          <button
+            id="settings-button"
+            class="icon-button"
+            type="button"
+            aria-label="Open settings"
+            aria-expanded="false"
+            aria-controls="settings-popup"
+          >
+            <span aria-hidden="true">⚙</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="settings-overlay" class="settings-overlay" hidden></div>
+      <div id="settings-popup" class="settings-popup" hidden>
+        <div class="settings-popup-header">
+          <div>
+            <p class="eyebrow">Appearance</p>
+            <h2>Settings</h2>
+          </div>
+          <button
+            id="close-settings-button"
+            class="icon-button icon-button-small"
+            type="button"
+            aria-label="Close settings"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <label class="field-label settings-label" for="theme-toggle">Theme</label>
+              <p class="meta-text">Switch between light and dark mode.</p>
+            </div>
+            <button id="theme-toggle" class="ghost-button" type="button">
+              Toggle theme
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <label class="field-label settings-label" for="accent-input">Accent</label>
+          <p class="meta-text">Choose the color used for emphasis and actions.</p>
+          <label class="accent-picker" for="accent-input">
+            <span>Accent color</span>
+            <input id="accent-input" type="color" value="#d97706" />
+          </label>
+        </div>
+      </div>
+
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <div>
+              <p class="eyebrow">Recent sessions</p>
+              <h2>Quiz history</h2>
+            </div>
+          </div>
+
+          <section class="sidebar-section">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Recent sessions</p>
+                <h3>Quiz history</h3>
+              </div>
+            </div>
+            <div id="quizzes-list" class="quizzes-list"></div>
+          </section>
+        </aside>
+
+        <main class="main-panel">
+          <section class="page-section">
+            <section class="quiz-generator-card">
+              <div class="concepts-header">
+                <div>
+                  <p class="eyebrow">Quiz generation</p>
+                  <h2>Build a recall session</h2>
+                </div>
+                <span id="quiz-status" class="status-pill">Idle</span>
+              </div>
+
+              <div class="quiz-controls quiz-controls-single">
+                <label class="field-label" for="quiz-count-input">Question count</label>
+                <select id="quiz-count-input" class="text-input">
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5" selected>5</option>
+                  <option value="6">6</option>
+                  <option value="7">7</option>
+                  <option value="8">8</option>
+                </select>
+              </div>
+
+              <p class="meta-text">
+                The system chooses which concepts to ask based on decayed confidence,
+                prior quiz frequency, and current confidence strength.
+              </p>
+
+              <button id="generate-quiz-button" class="primary-button" type="button">
+                Generate quiz
+              </button>
+              <p id="quiz-error-message" class="error-message" hidden></p>
+            </section>
+
+            <section class="quiz-workspace-card">
+              <div class="section-heading">
+                <div>
+                  <p class="eyebrow">Session workspace</p>
+                  <h3>Answer and score</h3>
+                </div>
+              </div>
+              <div id="quiz-workspace"></div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/quizzes.js"></script>
+  </body>
+</html>

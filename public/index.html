@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PROBE Notes</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-frame">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <p class="eyebrow">Recall workspace</p>
+          <h1>PROBE</h1>
+        </div>
+
+        <nav class="view-switcher topbar-nav" aria-label="Primary">
+          <a class="view-button" href="/map">Map</a>
+          <a class="view-button is-active" href="/">Notes</a>
+          <a class="view-button" href="/quizzes">Quizzes</a>
+        </nav>
+
+        <div class="topbar-actions">
+          <button
+            id="settings-button"
+            class="icon-button"
+            type="button"
+            aria-label="Open settings"
+            aria-expanded="false"
+            aria-controls="settings-popup"
+          >
+            <span aria-hidden="true">⚙</span>
+          </button>
+        </div>
+      </header>
+
+      <div id="settings-overlay" class="settings-overlay" hidden></div>
+      <div id="settings-popup" class="settings-popup" hidden>
+        <div class="settings-popup-header">
+          <div>
+            <p class="eyebrow">Appearance</p>
+            <h2>Settings</h2>
+          </div>
+          <button
+            id="close-settings-button"
+            class="icon-button icon-button-small"
+            type="button"
+            aria-label="Close settings"
+          >
+            <span aria-hidden="true">×</span>
+          </button>
+        </div>
+
+        <div class="settings-section">
+          <div class="settings-row">
+            <div>
+              <label class="field-label settings-label" for="theme-toggle">Theme</label>
+              <p class="meta-text">Switch between light and dark mode.</p>
+            </div>
+            <button id="theme-toggle" class="ghost-button" type="button">
+              Toggle theme
+            </button>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <label class="field-label settings-label" for="accent-input">Accent</label>
+          <p class="meta-text">Choose the color used for emphasis and actions.</p>
+          <label class="accent-picker" for="accent-input">
+            <span>Accent color</span>
+            <input id="accent-input" type="color" value="#d97706" />
+          </label>
+        </div>
+      </div>
+
+      <div class="app-shell">
+        <aside class="sidebar">
+          <div class="sidebar-header">
+            <div>
+              <p class="eyebrow">Saved notes</p>
+              <h2>Library</h2>
+            </div>
+            <button id="new-note-button" class="primary-button" type="button">
+              New note
+            </button>
+          </div>
+
+          <section class="sidebar-section">
+            <div class="section-heading">
+              <p class="eyebrow">Saved notes</p>
+              <span class="meta-text" id="note-count-label">0 notes</span>
+            </div>
+            <div id="notes-list" class="notes-list"></div>
+          </section>
+        </aside>
+
+        <main class="main-panel">
+          <section class="page-section">
+            <div class="editor-card">
+              <div class="editor-topbar">
+                <div>
+                  <p class="eyebrow">Note editor</p>
+                  <h2 id="editor-heading">Untitled note</h2>
+                </div>
+                <div class="status-cluster">
+                  <span id="save-status" class="status-pill">Idle</span>
+                  <button id="save-button" class="primary-button" type="button">
+                    Save note
+                  </button>
+                </div>
+              </div>
+
+              <label class="field-label" for="title-input">Title</label>
+              <input
+                id="title-input"
+                class="text-input"
+                type="text"
+                placeholder="Optional title"
+              />
+
+              <label class="field-label" for="content-input">Content</label>
+              <textarea
+                id="content-input"
+                class="editor-input"
+                placeholder="Write what you learned. Saving will trigger concept extraction."
+              ></textarea>
+
+              <p id="error-message" class="error-message" hidden></p>
+            </div>
+
+            <section class="concepts-card">
+              <div class="concepts-header">
+                <div>
+                  <p class="eyebrow">Generated concepts</p>
+                  <h3>Concept store</h3>
+                </div>
+                <button id="retry-button" class="ghost-button" type="button">
+                  Retry extraction
+                </button>
+              </div>
+              <div id="concepts-list" class="concepts-list"></div>
+            </section>
+          </section>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/notes.js"></script>
+  </body>
+</html>
