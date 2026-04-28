@@ -14,6 +14,7 @@ const __dirname = path.dirname(__filename);
 const legacyDataDir = path.join(__dirname, "data");
 const dataDir = resolveDataDir();
 const notesPath = path.join(dataDir, "notes.json");
+const directoriesPath = path.join(dataDir, "directories.json");
 const conceptsPath = path.join(dataDir, "concepts.json");
 const quizzesPath = path.join(dataDir, "quizzes.json");
 const mapPath = path.join(dataDir, "map.json");
@@ -63,6 +64,73 @@ function createApp() {
     }
   });
 
+  app.post("/api/notes/:noteId/move", async (req, res, next) => {
+    try {
+      const notes = await readJson(notesPath, []);
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      const movedNote = moveNote(notes, req.params.noteId, req.body, directories);
+      await writeJson(notesPath, sortNotes(notes));
+      res.json(movedNote);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.get("/api/directories", async (_req, res, next) => {
+    try {
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      res.json(sortDirectories(directories));
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/directories", async (req, res, next) => {
+    try {
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      const directory = createDirectory(directories, req.body);
+      await writeJson(directoriesPath, sortDirectories(directories));
+      res.json(directory);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.patch("/api/directories/:directoryId", async (req, res, next) => {
+    try {
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      const directory = updateDirectory(directories, req.params.directoryId, req.body);
+      await writeJson(directoriesPath, sortDirectories(directories));
+      res.json(directory);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.post("/api/directories/:directoryId/move", async (req, res, next) => {
+    try {
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      const directory = moveDirectory(directories, req.params.directoryId, req.body);
+      await writeJson(directoriesPath, sortDirectories(directories));
+      res.json(directory);
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  app.delete("/api/directories/:directoryId", async (req, res, next) => {
+    try {
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      const notes = await readJson(notesPath, []);
+      deleteDirectory(directories, notes, req.params.directoryId);
+      await writeJson(directoriesPath, sortDirectories(directories));
+      await writeJson(notesPath, sortNotes(notes));
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   app.get("/api/concepts", async (req, res, next) => {
     try {
       const concepts = await readJson(conceptsPath, []);
@@ -103,7 +171,8 @@ function createApp() {
   app.post("/api/notes", async (req, res, next) => {
     try {
       const notes = await readJson(notesPath, []);
-      const savedNote = upsertNote(notes, req.body);
+      const directories = normalizeDirectories(await readJson(directoriesPath, []));
+      const savedNote = upsertNote(notes, req.body, directories);
       await writeJson(notesPath, sortNotes(notes));
       res.json(savedNote);
     } catch (error) {
@@ -315,6 +384,7 @@ function createApp() {
 async function ensureDataFiles() {
   await fs.mkdir(dataDir, { recursive: true });
   await ensureJsonFile(notesPath, [], path.join(legacyDataDir, "notes.json"));
+  await ensureJsonFile(directoriesPath, [], path.join(legacyDataDir, "directories.json"));
   await ensureJsonFile(conceptsPath, [], path.join(legacyDataDir, "concepts.json"));
   await ensureJsonFile(quizzesPath, [], path.join(legacyDataDir, "quizzes.json"));
   await ensureJsonFile(mapPath, createEmptyMap(), path.join(legacyDataDir, "map.json"));
@@ -366,10 +436,15 @@ function resolveDataDir() {
   return path.join(os.homedir(), ".probe");
 }
 
-function sanitizeNote(payload) {
+function sanitizeNote(payload, directories = []) {
   const note = payload && typeof payload === "object" ? payload : {};
   const title = typeof note.title === "string" ? note.title.trim() : "";
   const content = typeof note.content === "string" ? note.content.trim() : "";
+  const sanitized = {
+    id: typeof note.id === "string" && note.id ? note.id : "",
+    title,
+    content
+  };
 
   if (!content) {
     const error = new Error("Note content is required.");
@@ -377,28 +452,33 @@ function sanitizeNote(payload) {
     throw error;
   }
 
-  return {
-    id: typeof note.id === "string" && note.id ? note.id : "",
-    title,
-    content
-  };
+  if (Object.hasOwn(note, "directoryId")) {
+    sanitized.directoryId = sanitizeDirectoryTarget(note.directoryId, directories);
+  }
+
+  return sanitized;
 }
 
-function upsertNote(notes, payload) {
-  const note = sanitizeNote(payload);
+function upsertNote(notes, payload, directories = []) {
+  const note = sanitizeNote(payload, directories);
   const now = new Date().toISOString();
   const existingIndex = notes.findIndex((entry) => entry.id === note.id);
+  const directoryPatch = Object.hasOwn(note, "directoryId")
+    ? { directoryId: note.directoryId }
+    : {};
   const savedNote =
     existingIndex >= 0
       ? {
           ...notes[existingIndex],
           ...note,
+          ...directoryPatch,
           updatedAt: now
         }
       : {
           id: note.id || createId("note"),
           title: note.title || deriveTitle(note.content),
           content: note.content,
+          directoryId: note.directoryId || null,
           createdAt: now,
           updatedAt: now
         };
@@ -412,6 +492,236 @@ function upsertNote(notes, payload) {
   return savedNote;
 }
 
+function moveNote(notes, noteId, payload, directories = []) {
+  const noteIndex = notes.findIndex((entry) => entry.id === noteId);
+
+  if (noteIndex < 0) {
+    const error = new Error("Note not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const targetDirectoryId = sanitizeDirectoryTarget(
+    payload && typeof payload === "object" ? payload.directoryId : null,
+    directories
+  );
+  const movedNote = {
+    ...notes[noteIndex],
+    directoryId: targetDirectoryId,
+    updatedAt: new Date().toISOString()
+  };
+  notes[noteIndex] = movedNote;
+  return movedNote;
+}
+
+function normalizeDirectories(directories) {
+  if (!Array.isArray(directories)) {
+    return [];
+  }
+
+  const now = new Date().toISOString();
+  const byId = new Map();
+
+  for (const directory of directories) {
+    if (!directory || typeof directory !== "object" || typeof directory.id !== "string") {
+      continue;
+    }
+
+    const name = typeof directory.name === "string" ? directory.name.trim() : "";
+
+    if (!name || byId.has(directory.id)) {
+      continue;
+    }
+
+    byId.set(directory.id, {
+      id: directory.id,
+      name,
+      parentId:
+        typeof directory.parentId === "string" && directory.parentId
+          ? directory.parentId
+          : null,
+      createdAt: typeof directory.createdAt === "string" ? directory.createdAt : now,
+      updatedAt: typeof directory.updatedAt === "string" ? directory.updatedAt : now
+    });
+  }
+
+  const normalized = [...byId.values()];
+
+  for (const directory of normalized) {
+    if (!directory.parentId || !byId.has(directory.parentId) || directory.parentId === directory.id) {
+      directory.parentId = null;
+      continue;
+    }
+
+    if (isDescendantDirectory(normalized, directory.parentId, directory.id)) {
+      directory.parentId = null;
+    }
+  }
+
+  return normalized;
+}
+
+function createDirectory(directories, payload) {
+  const directory = sanitizeDirectoryPayload(payload, directories);
+  const now = new Date().toISOString();
+  const savedDirectory = {
+    id: createId("dir"),
+    name: directory.name,
+    parentId: directory.parentId,
+    createdAt: now,
+    updatedAt: now
+  };
+  directories.push(savedDirectory);
+  return savedDirectory;
+}
+
+function updateDirectory(directories, directoryId, payload) {
+  const directoryIndex = directories.findIndex((entry) => entry.id === directoryId);
+
+  if (directoryIndex < 0) {
+    const error = new Error("Directory not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const name =
+    payload && typeof payload === "object" && typeof payload.name === "string"
+      ? payload.name.trim()
+      : "";
+
+  if (!name) {
+    const error = new Error("Directory name is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const updatedDirectory = {
+    ...directories[directoryIndex],
+    name,
+    updatedAt: new Date().toISOString()
+  };
+  directories[directoryIndex] = updatedDirectory;
+  return updatedDirectory;
+}
+
+function moveDirectory(directories, directoryId, payload) {
+  const directoryIndex = directories.findIndex((entry) => entry.id === directoryId);
+
+  if (directoryIndex < 0) {
+    const error = new Error("Directory not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const parentId = sanitizeDirectoryTarget(
+    payload && typeof payload === "object" ? payload.parentId : null,
+    directories
+  );
+
+  if (parentId === directoryId || isDescendantDirectory(directories, parentId, directoryId)) {
+    const error = new Error("A directory cannot be moved into itself or one of its children.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const movedDirectory = {
+    ...directories[directoryIndex],
+    parentId,
+    updatedAt: new Date().toISOString()
+  };
+  directories[directoryIndex] = movedDirectory;
+  return movedDirectory;
+}
+
+function deleteDirectory(directories, notes, directoryId) {
+  const directoryIndex = directories.findIndex((entry) => entry.id === directoryId);
+
+  if (directoryIndex < 0) {
+    const error = new Error("Directory not found.");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const directory = directories[directoryIndex];
+  const now = new Date().toISOString();
+  directories.splice(directoryIndex, 1);
+
+  for (const child of directories) {
+    if (child.parentId === directoryId) {
+      child.parentId = directory.parentId;
+      child.updatedAt = now;
+    }
+  }
+
+  for (const note of notes) {
+    if (note.directoryId === directoryId) {
+      note.directoryId = directory.parentId;
+      note.updatedAt = now;
+    }
+  }
+}
+
+function sanitizeDirectoryPayload(payload, directories) {
+  const directory = payload && typeof payload === "object" ? payload : {};
+  const name = typeof directory.name === "string" ? directory.name.trim() : "";
+
+  if (!name) {
+    const error = new Error("Directory name is required.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return {
+    name,
+    parentId: sanitizeDirectoryTarget(directory.parentId, directories)
+  };
+}
+
+function sanitizeDirectoryTarget(directoryId, directories) {
+  if (directoryId === null || directoryId === undefined || directoryId === "") {
+    return null;
+  }
+
+  if (typeof directoryId !== "string") {
+    const error = new Error("Directory id must be a string.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!directories.some((directory) => directory.id === directoryId)) {
+    const error = new Error("Directory not found.");
+    error.statusCode = 400;
+    throw error;
+  }
+
+  return directoryId;
+}
+
+function isDescendantDirectory(directories, possibleDescendantId, ancestorId) {
+  if (!possibleDescendantId) {
+    return false;
+  }
+
+  const byId = new Map(directories.map((directory) => [directory.id, directory]));
+  let cursor = byId.get(possibleDescendantId);
+  const visited = new Set();
+
+  while (cursor) {
+    if (cursor.id === ancestorId) {
+      return true;
+    }
+
+    if (!cursor.parentId || visited.has(cursor.id)) {
+      return false;
+    }
+
+    visited.add(cursor.id);
+    cursor = byId.get(cursor.parentId);
+  }
+
+  return false;
+}
+
 function deriveTitle(content) {
   return content.split("\n").find(Boolean)?.slice(0, 48) || "Untitled note";
 }
@@ -419,6 +729,12 @@ function deriveTitle(content) {
 function sortNotes(notes) {
   return [...notes].sort((left, right) =>
     right.updatedAt.localeCompare(left.updatedAt)
+  );
+}
+
+function sortDirectories(directories) {
+  return [...directories].sort((left, right) =>
+    left.name.localeCompare(right.name, undefined, { sensitivity: "base" })
   );
 }
 
@@ -1236,6 +1552,9 @@ function clampNumber(value, min, max) {
 export {
   categoryOptions,
   createApp,
+  createDirectory,
+  deleteDirectory,
+  directoriesPath,
   ensureDataFiles,
   computeDecayedConfidence,
   computeQuizPriority,
@@ -1243,11 +1562,15 @@ export {
   dataDir,
   readJson,
   mapPath,
+  moveDirectory,
+  moveNote,
+  normalizeDirectories,
   normalizeMapData,
   addLlmConnections,
   resolveDataDir,
   sanitizeConceptRelations,
   selectQuizConcepts,
+  sortDirectories,
   sortNotes,
   sortQuizzes,
   upsertManualConnection,

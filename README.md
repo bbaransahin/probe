@@ -54,6 +54,7 @@ npm test
 By default, PROBE stores JSON data in the `data/` directory:
 
 - `data/notes.json`
+- `data/directories.json`
 - `data/concepts.json`
 - `data/quizzes.json`
 - `data/map.json`

@@ -86,17 +86,27 @@
               <p class="eyebrow">Saved notes</p>
               <h2>Library</h2>
             </div>
-            <button id="new-note-button" class="primary-button" type="button">
-              New note
-            </button>
+            <div class="library-actions">
+              <button id="new-directory-button" class="ghost-button" type="button">
+                New folder
+              </button>
+              <button id="new-note-button" class="primary-button" type="button">
+                New note
+              </button>
+            </div>
           </div>
 
           <section class="sidebar-section">
             <div class="section-heading">
-              <p class="eyebrow">Saved notes</p>
+              <p class="eyebrow" id="active-directory-label">Inbox</p>
               <span class="meta-text" id="note-count-label">0 notes</span>
             </div>
-            <div id="notes-list" class="notes-list"></div>
+            <div
+              id="notes-list"
+              class="notes-list library-tree"
+              role="tree"
+              aria-label="Library directories and notes"
+            ></div>
           </section>
         </aside>
 

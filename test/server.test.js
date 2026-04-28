@@ -8,6 +8,7 @@ process.env.NODE_ENV = "test";
 const rootDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const testDataDir = path.join(rootDir, "data");
 const notesPath = path.join(testDataDir, "notes.json");
+const directoriesDataPath = path.join(testDataDir, "directories.json");
 const conceptsPath = path.join(testDataDir, "concepts.json");
 const quizzesPath = path.join(testDataDir, "quizzes.json");
 const mapDataPath = path.join(testDataDir, "map.json");
@@ -16,10 +17,16 @@ const {
   addLlmConnections,
   computeDecayedConfidence,
   computeQuizPriority,
+  createDirectory,
   createFallbackQuizItems,
   dataDir,
+  deleteDirectory,
+  directoriesPath,
   ensureDataFiles,
   mapPath,
+  moveDirectory,
+  moveNote,
+  normalizeDirectories,
   normalizeMapData,
   readJson,
   resolveDataDir,
@@ -36,6 +43,7 @@ const {
 async function resetData() {
   await fs.mkdir(testDataDir, { recursive: true });
   await fs.writeFile(notesPath, "[]\n", "utf8");
+  await fs.writeFile(directoriesDataPath, "[]\n", "utf8");
   await fs.writeFile(conceptsPath, "[]\n", "utf8");
   await fs.writeFile(quizzesPath, "[]\n", "utf8");
   await fs.writeFile(
@@ -74,6 +82,7 @@ test("test environment stores data in the project data directory", () => {
   assert.equal(resolveDataDir(), dataDir);
   assert.equal(dataDir, testDataDir);
   assert.equal(mapPath, mapDataPath);
+  assert.equal(directoriesPath, directoriesDataPath);
 });
 
 test("PROBE_DATA_DIR overrides the default storage location", () => {
@@ -133,6 +142,131 @@ test("concept listing filters by note id", async () => {
 
   assert.equal(filtered.length, 1);
   assert.equal(filtered[0].name, "Force");
+});
+
+test("note save can assign a directory while legacy notes stay in inbox", async () => {
+  await ensureDataFiles();
+  await resetData();
+  const directories = [];
+  const projectDirectory = createDirectory(directories, { name: "Physics" });
+  const notes = [];
+
+  const directedNote = upsertNote(
+    notes,
+    {
+      title: "Kinematics",
+      content: "Velocity measures displacement over time.",
+      directoryId: projectDirectory.id
+    },
+    directories
+  );
+  const inboxNote = upsertNote(notes, {
+    title: "Loose",
+    content: "This note has no directory yet."
+  });
+
+  assert.equal(directedNote.directoryId, projectDirectory.id);
+  assert.equal(inboxNote.directoryId, null);
+});
+
+test("moving notes validates target directories", async () => {
+  await ensureDataFiles();
+  await resetData();
+  const directories = [];
+  const targetDirectory = createDirectory(directories, { name: "Engineering" });
+  const notes = [
+    {
+      id: "note_a",
+      title: "Stress",
+      content: "Stress is force per unit area.",
+      directoryId: null,
+      createdAt: "2026-04-28T10:00:00.000Z",
+      updatedAt: "2026-04-28T10:00:00.000Z"
+    }
+  ];
+
+  const moved = moveNote(notes, "note_a", { directoryId: targetDirectory.id }, directories);
+  assert.equal(moved.directoryId, targetDirectory.id);
+  assert.throws(
+    () => moveNote(notes, "note_a", { directoryId: "missing" }, directories),
+    /Directory not found/
+  );
+});
+
+test("nested directory moves reject cycles", async () => {
+  await ensureDataFiles();
+  await resetData();
+  const directories = [];
+  const parent = createDirectory(directories, { name: "Parent" });
+  const child = createDirectory(directories, {
+    name: "Child",
+    parentId: parent.id
+  });
+
+  assert.equal(moveDirectory(directories, child.id, { parentId: null }).parentId, null);
+  assert.equal(moveDirectory(directories, child.id, { parentId: parent.id }).parentId, parent.id);
+  assert.throws(
+    () => moveDirectory(directories, parent.id, { parentId: child.id }),
+    /cannot be moved/
+  );
+});
+
+test("directory deletion reparents child directories and notes", async () => {
+  await ensureDataFiles();
+  await resetData();
+  const directories = [];
+  const parent = createDirectory(directories, { name: "Parent" });
+  const child = createDirectory(directories, {
+    name: "Child",
+    parentId: parent.id
+  });
+  const notes = [
+    {
+      id: "note_a",
+      title: "Orbit",
+      content: "An orbit is a curved path around a body.",
+      directoryId: child.id,
+      createdAt: "2026-04-28T10:00:00.000Z",
+      updatedAt: "2026-04-28T10:00:00.000Z"
+    }
+  ];
+
+  deleteDirectory(directories, notes, child.id);
+
+  assert.equal(directories.some((directory) => directory.id === child.id), false);
+  assert.equal(notes[0].directoryId, parent.id);
+});
+
+test("directory normalization drops invalid parents and cycles", () => {
+  const normalized = normalizeDirectories([
+    {
+      id: "dir_a",
+      name: "A",
+      parentId: "dir_b",
+      createdAt: "2026-04-28T10:00:00.000Z",
+      updatedAt: "2026-04-28T10:00:00.000Z"
+    },
+    {
+      id: "dir_b",
+      name: "B",
+      parentId: "dir_a",
+      createdAt: "2026-04-28T10:00:00.000Z",
+      updatedAt: "2026-04-28T10:00:00.000Z"
+    },
+    {
+      id: "dir_c",
+      name: "C",
+      parentId: "missing",
+      createdAt: "2026-04-28T10:00:00.000Z",
+      updatedAt: "2026-04-28T10:00:00.000Z"
+    }
+  ]);
+
+  const dirA = normalized.find((directory) => directory.id === "dir_a");
+  const dirB = normalized.find((directory) => directory.id === "dir_b");
+
+  assert.equal(dirA.parentId === "dir_b" && dirB.parentId === "dir_a", false);
+  assert.equal(normalized.find((directory) => directory.id === "dir_c").parentId, null);
 });
 
 test("map data file is initialized", async () => {
