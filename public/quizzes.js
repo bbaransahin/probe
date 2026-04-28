@@ -8,6 +8,7 @@ const state = {
 
 const elements = {
   quizCountInput: document.querySelector("#quiz-count-input"),
+  quizCountValue: document.querySelector("#quiz-count-value"),
   generateQuizButton: document.querySelector("#generate-quiz-button"),
   quizzesList: document.querySelector("#quizzes-list"),
   quizWorkspace: document.querySelector("#quiz-workspace"),
@@ -22,12 +23,18 @@ async function initialize() {
 }
 
 function bindEvents() {
+  updateQuizCountValue();
+  elements.quizCountInput.addEventListener("input", updateQuizCountValue);
   elements.generateQuizButton.addEventListener("click", generateQuiz);
   elements.quizWorkspace.addEventListener("click", (event) => {
     if (event.target.id === "submit-quiz-button") {
       submitActiveQuiz();
     }
   });
+}
+
+function updateQuizCountValue() {
+  elements.quizCountValue.textContent = elements.quizCountInput.value;
 }
 
 async function refreshQuizzes() {

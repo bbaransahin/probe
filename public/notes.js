@@ -1,4 +1,4 @@
-import { apiJson, escapeHtml, initializeAppearance } from "./shared.js";
+import { apiJson, appConfirm, appPrompt, escapeHtml, initializeAppearance } from "./shared.js";
 
 const state = {
   notes: [],
@@ -13,7 +13,6 @@ const state = {
 
 const elements = {
   notesList: document.querySelector("#notes-list"),
-  noteCountLabel: document.querySelector("#note-count-label"),
   activeDirectoryLabel: document.querySelector("#active-directory-label"),
   conceptsList: document.querySelector("#concepts-list"),
   titleInput: document.querySelector("#title-input"),
@@ -87,7 +86,11 @@ function createDraft() {
 }
 
 async function createDirectory() {
-  const name = window.prompt("Folder name");
+  const name = await appPrompt({
+    title: "New folder",
+    label: "Folder name",
+    confirmLabel: "Create folder"
+  });
 
   if (!name || !name.trim()) {
     return;
@@ -128,7 +131,12 @@ async function renameDirectory(directoryId) {
     return;
   }
 
-  const name = window.prompt("Folder name", directory.name);
+  const name = await appPrompt({
+    title: "Rename folder",
+    label: "Folder name",
+    value: directory.name,
+    confirmLabel: "Rename folder"
+  });
 
   if (!name || !name.trim()) {
     return;
@@ -151,7 +159,18 @@ async function renameDirectory(directoryId) {
 async function deleteDirectory(directoryId) {
   const directory = state.directories.find((entry) => entry.id === directoryId);
 
-  if (!directory || !window.confirm(`Delete "${directory.name}"? Notes and folders inside will move up one level.`)) {
+  if (!directory) {
+    return;
+  }
+
+  const shouldDelete = await appConfirm({
+    title: `Delete "${directory.name}"?`,
+    message: "Notes and folders inside will move up one level.",
+    confirmLabel: "Delete folder",
+    destructive: true
+  });
+
+  if (!shouldDelete) {
     return;
   }
 
@@ -206,7 +225,6 @@ function hydrateEditor(note) {
 }
 
 function renderLibrary() {
-  elements.noteCountLabel.textContent = `${state.notes.length} note${state.notes.length === 1 ? "" : "s"}`;
   elements.activeDirectoryLabel.textContent = getDirectoryName(state.activeDirectoryId);
 
   const childrenByParent = groupDirectoriesByParent();

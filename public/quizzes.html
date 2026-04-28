@@ -111,15 +111,21 @@
               </div>
 
               <div class="quiz-controls quiz-controls-single">
-                <label class="field-label" for="quiz-count-input">Question count</label>
-                <select id="quiz-count-input" class="text-input">
-                  <option value="3">3</option>
-                  <option value="4">4</option>
-                  <option value="5" selected>5</option>
-                  <option value="6">6</option>
-                  <option value="7">7</option>
-                  <option value="8">8</option>
-                </select>
+                <div class="range-field">
+                  <div class="range-field-header">
+                    <label class="field-label" for="quiz-count-input">Question count</label>
+                    <span id="quiz-count-value" class="range-value">5</span>
+                  </div>
+                  <input
+                    id="quiz-count-input"
+                    class="range-input"
+                    type="range"
+                    min="3"
+                    max="8"
+                    step="1"
+                    value="5"
+                  />
+                </div>
               </div>
 
               <p class="meta-text">

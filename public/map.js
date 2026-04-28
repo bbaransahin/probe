@@ -1,4 +1,4 @@
-import { apiJson, escapeHtml, initializeAppearance } from "./shared.js";
+import { apiJson, appConfirm, escapeHtml, initializeAppearance } from "./shared.js";
 
 const canvasSize = { width: 1600, height: 1000 };
 const mapNodeSize = 132;
@@ -406,7 +406,14 @@ async function deleteConnection(connectionId) {
 async function rebuildMap() {
   clearError();
 
-  if (!window.confirm("Rebuild all connections from scratch? Manual links will be forgotten.")) {
+  const shouldRebuild = await appConfirm({
+    title: "Rebuild all connections?",
+    message: "Manual links will be forgotten and replaced with a fresh graph from all concepts.",
+    confirmLabel: "Rebuild graph",
+    destructive: true
+  });
+
+  if (!shouldRebuild) {
     return;
   }
 
